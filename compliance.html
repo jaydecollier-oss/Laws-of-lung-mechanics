@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lung Compliance: Stiff vs Floppy Lungs</title>
+<style>
+:root {
+  --bg: #1e1e1e;
+  --panel: #2a2a2a;
+  --panel2: #333;
+  --text: #f4f4f4;
+  --muted: #cfcfcf;
+  --accent: #4aa3ff;
+  --warn: #f39c12;
+  --bad: #e74c3c;
+  --good: #2ecc71;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 20px;
+}
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  background: var(--panel);
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+}
+h1, h2 { text-align: center; margin-top: 0; }
+.subtitle { text-align: center; color: var(--muted); margin-top: -8px; }
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.controls, .info, .quiz {
+  background: var(--panel2);
+  border-radius: 10px;
+  padding: 16px;
+}
+label { display:block; margin-top: 14px; font-weight: 600; }
+input[type=range] { width: 100%; }
+button, select {
+  background: #444;
+  color: white;
+  border: 1px solid #666;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 10px;
+  cursor: pointer;
+}
+button:hover { background:#555; }
+canvas {
+  display:block;
+  width: 100%;
+  background:#202020;
+  border:1px solid #444;
+  border-radius: 10px;
+  margin: 18px 0;
+}
+.summary {
+  background: #f1c40f;
+  color:#111;
+  border-radius: 10px;
+  padding: 14px;
+  font-weight: 700;
+  text-align:center;
+  min-height: 48px;
+}
+.eq {
+  background: #181818;
+  padding: 12px;
+  border-radius: 8px;
+  font-family: Georgia, serif;
+  text-align:center;
+  font-size: 1.15rem;
+}
+.small { color: var(--muted); font-size: 0.92rem; line-height: 1.45; }
+a { color: #8cc7ff; }
+.cards {
+  display:grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+}
+.card {
+  background:#333;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #444;
+  text-decoration:none;
+  color:white;
+}
+.card:hover { transform: translateY(-2px); background:#3a3a3a; }
+.badge { display:inline-block; padding:4px 8px; border-radius:999px; background:#444; font-size:.8rem; color:#ddd; }
+@media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <p><a href="index.html">← Back to Lung Mechanics Apps</a></p>
+  <h1>Lung Compliance: Stiff vs Floppy Lungs</h1>
+  <p class="subtitle">Compare how easily the lungs expand in fibrosis and emphysema.</p>
+  <div class="eq">Compliance = Change in Volume / Change in Pressure</div>
+
+  <canvas id="canvas" width="960" height="470"></canvas>
+
+  <div class="grid">
+    <div class="controls">
+      <h2>Interact</h2>
+      
+<label>Applied inspiratory pressure: <span id="pval">50</span>%</label>
+<input id="pressure" type="range" min="0" max="100" value="50" oninput="pval.innerText=this.value">
+<label>Clinical lung type</label>
+<select id="type">
+<option value="normal">Normal</option>
+<option value="fibrosis">Fibrosis / ARDS: low compliance</option>
+<option value="emphysema">Emphysema: high compliance, poor recoil</option>
+</select>
+
+    </div>
+    <div class="info">
+      <h2>Clinical link</h2>
+      <p>Reduced compliance, as in pulmonary fibrosis or ARDS, means the lungs are stiff. Increased compliance, as in emphysema, means the lungs inflate easily but lose elastic recoil, contributing to air trapping.</p>
+      <div class="summary" id="summary"></div>
+      <p class="small" id="numbers"></p>
+    </div>
+  </div>
+
+  <div class="quiz" style="margin-top:18px;">
+    <h2>Checkpoint</h2>
+    <p>In fibrosis, does compliance increase or decrease?</p>
+    <button onclick="showAnswer()">Show answer</button>
+    <p id="answer" class="small"></p>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const summary = document.getElementById('summary');
+const numbers = document.getElementById('numbers');
+function val(id) { return Number(document.getElementById(id).value); }
+function text(id) { return document.getElementById(id).value; }
+function showAnswer() { document.getElementById('answer').innerText = `Compliance decreases. The lungs are stiffer, so more pressure is needed to generate a useful volume change.`; }
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y, x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x, y+h, r);
+  ctx.arcTo(x, y+h, x, y, r);
+  ctx.arcTo(x, y, x+w, y, r);
+  ctx.closePath();
+}
+
+let t=0;
+function animate(){
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+ const p=val('pressure'); const type=text('type');
+ let comp = type==='fibrosis' ? 0.45 : type==='emphysema' ? 1.55 : 1;
+ let recoil = type==='emphysema' ? 0.35 : type==='fibrosis' ? 1.25 : 1;
+ let vol = 70 + p*comp*1.6;
+ ctx.fillStyle='#fff'; ctx.font='22px Arial'; ctx.textAlign='center';
+ ctx.fillText('For the same pressure, lung volume depends on compliance',480,35);
+ ctx.strokeStyle='#9ad0ff'; ctx.lineWidth=4; ctx.fillStyle='rgba(74,163,255,0.2)';
+ ctx.beginPath(); ctx.ellipse(390,220,vol*0.55,vol,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+ ctx.beginPath(); ctx.ellipse(570,220,vol*0.55,vol,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+ ctx.fillStyle='#f39c12'; ctx.fillRect(120,380,720,24);
+ ctx.fillStyle='#222'; ctx.fillRect(120,380,Math.max(20,720*(p/100)),24);
+ ctx.fillStyle='#fff'; ctx.fillText('Applied pressure',480,425);
+ ctx.strokeStyle='#e74c3c'; ctx.lineWidth=3;
+ for(let i=0;i<7;i++){ ctx.beginPath(); ctx.moveTo(340+i*45,250); ctx.lineTo(330+i*45,250-recoil*35); ctx.stroke(); }
+ if(type==='normal') summary.innerText='Normal: moderate pressure creates moderate volume change.';
+ if(type==='fibrosis') summary.innerText='Fibrosis/ARDS: stiff lungs need more pressure for the same volume.';
+ if(type==='emphysema') summary.innerText='Emphysema: lungs inflate easily, but poor recoil promotes air trapping.';
+ numbers.innerText=`Relative compliance: ${comp.toFixed(2)} | Approximate volume response: ${vol.toFixed(0)} | Elastic recoil: ${recoil.toFixed(2)}`;
+ requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+</body>
+</html>

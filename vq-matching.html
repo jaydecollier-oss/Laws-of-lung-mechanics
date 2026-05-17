@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ventilation–Perfusion Matching</title>
+<style>
+:root {
+  --bg: #1e1e1e;
+  --panel: #2a2a2a;
+  --panel2: #333;
+  --text: #f4f4f4;
+  --muted: #cfcfcf;
+  --accent: #4aa3ff;
+  --warn: #f39c12;
+  --bad: #e74c3c;
+  --good: #2ecc71;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 20px;
+}
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  background: var(--panel);
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+}
+h1, h2 { text-align: center; margin-top: 0; }
+.subtitle { text-align: center; color: var(--muted); margin-top: -8px; }
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.controls, .info, .quiz {
+  background: var(--panel2);
+  border-radius: 10px;
+  padding: 16px;
+}
+label { display:block; margin-top: 14px; font-weight: 600; }
+input[type=range] { width: 100%; }
+button, select {
+  background: #444;
+  color: white;
+  border: 1px solid #666;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 10px;
+  cursor: pointer;
+}
+button:hover { background:#555; }
+canvas {
+  display:block;
+  width: 100%;
+  background:#202020;
+  border:1px solid #444;
+  border-radius: 10px;
+  margin: 18px 0;
+}
+.summary {
+  background: #f1c40f;
+  color:#111;
+  border-radius: 10px;
+  padding: 14px;
+  font-weight: 700;
+  text-align:center;
+  min-height: 48px;
+}
+.eq {
+  background: #181818;
+  padding: 12px;
+  border-radius: 8px;
+  font-family: Georgia, serif;
+  text-align:center;
+  font-size: 1.15rem;
+}
+.small { color: var(--muted); font-size: 0.92rem; line-height: 1.45; }
+a { color: #8cc7ff; }
+.cards {
+  display:grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+}
+.card {
+  background:#333;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #444;
+  text-decoration:none;
+  color:white;
+}
+.card:hover { transform: translateY(-2px); background:#3a3a3a; }
+.badge { display:inline-block; padding:4px 8px; border-radius:999px; background:#444; font-size:.8rem; color:#ddd; }
+@media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <p><a href="index.html">← Back to Lung Mechanics Apps</a></p>
+  <h1>Ventilation–Perfusion Matching</h1>
+  <p class="subtitle">Adjust airflow and blood flow to understand shunt, dead space, and hypoxaemia.</p>
+  <div class="eq">Effective Gas Exchange Requires Matched Ventilation and Perfusion</div>
+
+  <canvas id="canvas" width="960" height="470"></canvas>
+
+  <div class="grid">
+    <div class="controls">
+      <h2>Interact</h2>
+      
+<label>Ventilation: <span id="vval">70</span>%</label>
+<input id="vent" type="range" min="0" max="100" value="70" oninput="vval.innerText=this.value">
+<label>Perfusion: <span id="qval">70</span>%</label>
+<input id="perf" type="range" min="0" max="100" value="70" oninput="qval.innerText=this.value">
+<label>Clinical scenario</label>
+<select id="scenario">
+<option value="manual">Manual sliders</option>
+<option value="pe">Pulmonary embolism</option>
+<option value="pneumonia">Pneumonia / atelectasis</option>
+<option value="copd">COPD regional mismatch</option>
+</select>
+
+    </div>
+    <div class="info">
+      <h2>Clinical link</h2>
+      <p>Pulmonary embolism creates ventilation without perfusion, known as dead space. Pneumonia or atelectasis can create perfusion without ventilation, known as shunt.</p>
+      <div class="summary" id="summary"></div>
+      <p class="small" id="numbers"></p>
+    </div>
+  </div>
+
+  <div class="quiz" style="margin-top:18px;">
+    <h2>Checkpoint</h2>
+    <p>What is the difference between dead space and shunt?</p>
+    <button onclick="showAnswer()">Show answer</button>
+    <p id="answer" class="small"></p>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const summary = document.getElementById('summary');
+const numbers = document.getElementById('numbers');
+function val(id) { return Number(document.getElementById(id).value); }
+function text(id) { return document.getElementById(id).value; }
+function showAnswer() { document.getElementById('answer').innerText = `Dead space is ventilation without enough perfusion. Shunt is perfusion without enough ventilation.`; }
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y, x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x, y+h, r);
+  ctx.arcTo(x, y+h, x, y, r);
+  ctx.arcTo(x, y, x+w, y, r);
+  ctx.closePath();
+}
+
+let t=0;
+function animate(){
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+ let v=val('vent'), q=val('perf'), sc=text('scenario');
+ if(sc==='pe'){ v=80; q=20; }
+ if(sc==='pneumonia'){ v=20; q=80; }
+ if(sc==='copd'){ v=45+Math.sin(t/30)*15; q=60; }
+ const match = Math.min(v,q)/Math.max(v,q,1);
+ const oxy = Math.min(v,q)*match;
+ ctx.fillStyle='#fff'; ctx.font='22px Arial'; ctx.textAlign='center';
+ ctx.fillText('Gas exchange is best when ventilation and perfusion are matched',480,35);
+ ctx.fillStyle='rgba(74,163,255,.18)'; ctx.strokeStyle='#9ad0ff'; ctx.lineWidth=4;
+ ctx.beginPath(); ctx.ellipse(350,225,150,180,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+ ctx.beginPath(); ctx.ellipse(610,225,150,180,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+ ctx.fillStyle='#3498db'; for(let i=0;i<v/6;i++){ ctx.beginPath(); ctx.arc(220+(i*41)%250,90+(i*53)%260,5,0,Math.PI*2); ctx.fill(); }
+ ctx.fillStyle='#e74c3c'; for(let i=0;i<q/6;i++){ ctx.beginPath(); ctx.arc(500+(i*43)%250,90+(i*49)%260,5,0,Math.PI*2); ctx.fill(); }
+ ctx.fillStyle='#f1c40f'; ctx.fillRect(180,420,oxy*6,20);
+ if(match>0.75) summary.innerText='Good V/Q matching: ventilation and perfusion are balanced.';
+ else if(v>q) summary.innerText='Dead space pattern: ventilation is present but perfusion is reduced, as in pulmonary embolism.';
+ else summary.innerText='Shunt pattern: perfusion is present but ventilation is reduced, as in pneumonia or atelectasis.';
+ numbers.innerText=`Ventilation: ${v.toFixed(0)}% | Perfusion: ${q.toFixed(0)}% | V/Q matching: ${match.toFixed(2)} | Relative oxygenation: ${oxy.toFixed(0)}%`;
+ t++; requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+</body>
+</html>

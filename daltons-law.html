@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dalton’s Law: Partial Pressure and Oxygen Availability</title>
+<style>
+:root {
+  --bg: #1e1e1e;
+  --panel: #2a2a2a;
+  --panel2: #333;
+  --text: #f4f4f4;
+  --muted: #cfcfcf;
+  --accent: #4aa3ff;
+  --warn: #f39c12;
+  --bad: #e74c3c;
+  --good: #2ecc71;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 20px;
+}
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  background: var(--panel);
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+}
+h1, h2 { text-align: center; margin-top: 0; }
+.subtitle { text-align: center; color: var(--muted); margin-top: -8px; }
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.controls, .info, .quiz {
+  background: var(--panel2);
+  border-radius: 10px;
+  padding: 16px;
+}
+label { display:block; margin-top: 14px; font-weight: 600; }
+input[type=range] { width: 100%; }
+button, select {
+  background: #444;
+  color: white;
+  border: 1px solid #666;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 10px;
+  cursor: pointer;
+}
+button:hover { background:#555; }
+canvas {
+  display:block;
+  width: 100%;
+  background:#202020;
+  border:1px solid #444;
+  border-radius: 10px;
+  margin: 18px 0;
+}
+.summary {
+  background: #f1c40f;
+  color:#111;
+  border-radius: 10px;
+  padding: 14px;
+  font-weight: 700;
+  text-align:center;
+  min-height: 48px;
+}
+.eq {
+  background: #181818;
+  padding: 12px;
+  border-radius: 8px;
+  font-family: Georgia, serif;
+  text-align:center;
+  font-size: 1.15rem;
+}
+.small { color: var(--muted); font-size: 0.92rem; line-height: 1.45; }
+a { color: #8cc7ff; }
+.cards {
+  display:grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+}
+.card {
+  background:#333;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #444;
+  text-decoration:none;
+  color:white;
+}
+.card:hover { transform: translateY(-2px); background:#3a3a3a; }
+.badge { display:inline-block; padding:4px 8px; border-radius:999px; background:#444; font-size:.8rem; color:#ddd; }
+@media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <p><a href="index.html">← Back to Lung Mechanics Apps</a></p>
+  <h1>Dalton’s Law: Partial Pressure and Oxygen Availability</h1>
+  <p class="subtitle">Explore how altitude and inspired oxygen affect oxygen partial pressure.</p>
+  <div class="eq">Total Pressure = Sum of Partial Pressures</div>
+
+  <canvas id="canvas" width="960" height="470"></canvas>
+
+  <div class="grid">
+    <div class="controls">
+      <h2>Interact</h2>
+      
+<label>Altitude: <span id="altval">0</span> m</label>
+<input id="alt" type="range" min="0" max="5000" value="0" step="100" oninput="altval.innerText=this.value">
+<label>Inspired oxygen fraction: <span id="fioval">21</span>%</label>
+<input id="fio2" type="range" min="21" max="100" value="21" oninput="fioval.innerText=this.value">
+
+    </div>
+    <div class="info">
+      <h2>Clinical link</h2>
+      <p>At altitude, barometric pressure falls, reducing oxygen partial pressure even if the oxygen percentage is unchanged. Supplemental oxygen increases inspired oxygen fraction.</p>
+      <div class="summary" id="summary"></div>
+      <p class="small" id="numbers"></p>
+    </div>
+  </div>
+
+  <div class="quiz" style="margin-top:18px;">
+    <h2>Checkpoint</h2>
+    <p>Why can oxygen percentage remain 21% at altitude but oxygen availability still fall?</p>
+    <button onclick="showAnswer()">Show answer</button>
+    <p id="answer" class="small"></p>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const summary = document.getElementById('summary');
+const numbers = document.getElementById('numbers');
+function val(id) { return Number(document.getElementById(id).value); }
+function text(id) { return document.getElementById(id).value; }
+function showAnswer() { document.getElementById('answer').innerText = `Because total barometric pressure falls, so the partial pressure of oxygen also falls.`; }
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y, x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x, y+h, r);
+  ctx.arcTo(x, y+h, x, y, r);
+  ctx.arcTo(x, y, x+w, y, r);
+  ctx.closePath();
+}
+
+function animate(){
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+ const alt=val('alt'), fio2=val('fio2')/100;
+ const pressure=760*Math.exp(-alt/7000);
+ const po2=pressure*fio2;
+ const sat=100/(1+Math.exp(-(po2-55)/9));
+ ctx.fillStyle='#fff'; ctx.font='22px Arial'; ctx.textAlign='center';
+ ctx.fillText('Oxygen availability depends on partial pressure, not just percentage',480,35);
+ ctx.fillStyle='#3498db'; ctx.fillRect(160,360-pressure/3,180,pressure/3);
+ ctx.fillStyle='#f1c40f'; ctx.fillRect(390,360-po2,180,po2);
+ ctx.fillStyle='#2ecc71'; ctx.fillRect(620,360-sat*2.2,180,sat*2.2);
+ ctx.fillStyle='#fff'; ctx.font='16px Arial';
+ ctx.fillText('Barometric pressure',250,390); ctx.fillText('Inspired PO₂',480,390); ctx.fillText('Approx O₂ saturation',710,390);
+ if(po2>140) summary.innerText='High oxygen availability: supplemental oxygen raises inspired PO₂.';
+ else if(po2>95) summary.innerText='Normal oxygen availability at sea level.';
+ else if(po2>65) summary.innerText='Reduced oxygen availability: mild altitude-related hypoxaemia risk.';
+ else summary.innerText='Low inspired PO₂: significant altitude-related hypoxaemia risk.';
+ numbers.innerText=`Barometric pressure: ${pressure.toFixed(0)} mmHg | Inspired PO₂: ${po2.toFixed(0)} mmHg | Approx saturation: ${sat.toFixed(0)}%`;
+ requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+</body>
+</html>

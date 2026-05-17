@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laplace’s Law: Alveolar Stability and Surfactant</title>
+<style>
+:root {
+  --bg: #1e1e1e;
+  --panel: #2a2a2a;
+  --panel2: #333;
+  --text: #f4f4f4;
+  --muted: #cfcfcf;
+  --accent: #4aa3ff;
+  --warn: #f39c12;
+  --bad: #e74c3c;
+  --good: #2ecc71;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 20px;
+}
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  background: var(--panel);
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+}
+h1, h2 { text-align: center; margin-top: 0; }
+.subtitle { text-align: center; color: var(--muted); margin-top: -8px; }
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.controls, .info, .quiz {
+  background: var(--panel2);
+  border-radius: 10px;
+  padding: 16px;
+}
+label { display:block; margin-top: 14px; font-weight: 600; }
+input[type=range] { width: 100%; }
+button, select {
+  background: #444;
+  color: white;
+  border: 1px solid #666;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 10px;
+  cursor: pointer;
+}
+button:hover { background:#555; }
+canvas {
+  display:block;
+  width: 100%;
+  background:#202020;
+  border:1px solid #444;
+  border-radius: 10px;
+  margin: 18px 0;
+}
+.summary {
+  background: #f1c40f;
+  color:#111;
+  border-radius: 10px;
+  padding: 14px;
+  font-weight: 700;
+  text-align:center;
+  min-height: 48px;
+}
+.eq {
+  background: #181818;
+  padding: 12px;
+  border-radius: 8px;
+  font-family: Georgia, serif;
+  text-align:center;
+  font-size: 1.15rem;
+}
+.small { color: var(--muted); font-size: 0.92rem; line-height: 1.45; }
+a { color: #8cc7ff; }
+.cards {
+  display:grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+}
+.card {
+  background:#333;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #444;
+  text-decoration:none;
+  color:white;
+}
+.card:hover { transform: translateY(-2px); background:#3a3a3a; }
+.badge { display:inline-block; padding:4px 8px; border-radius:999px; background:#444; font-size:.8rem; color:#ddd; }
+@media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <p><a href="index.html">← Back to Lung Mechanics Apps</a></p>
+  <h1>Laplace’s Law: Alveolar Stability and Surfactant</h1>
+  <p class="subtitle">See why small alveoli are vulnerable to collapse when surfactant is low.</p>
+  <div class="eq">Pressure = 2 × Surface Tension / Radius</div>
+
+  <canvas id="canvas" width="960" height="470"></canvas>
+
+  <div class="grid">
+    <div class="controls">
+      <h2>Interact</h2>
+      
+<label>Surfactant level: <span id="sval">70</span>%</label>
+<input id="surf" type="range" min="0" max="100" value="70" oninput="sval.innerText=this.value">
+<label>Clinical mode</label>
+<select id="mode">
+<option value="adult">Adult lung</option>
+<option value="prem">Premature infant / low surfactant risk</option>
+<option value="atelectasis">Atelectasis risk</option>
+</select>
+
+    </div>
+    <div class="info">
+      <h2>Clinical link</h2>
+      <p>Surfactant lowers surface tension and helps keep alveoli open. This is clinically important in neonatal respiratory distress syndrome and atelectasis.</p>
+      <div class="summary" id="summary"></div>
+      <p class="small" id="numbers"></p>
+    </div>
+  </div>
+
+  <div class="quiz" style="margin-top:18px;">
+    <h2>Checkpoint</h2>
+    <p>Why are small alveoli more likely to collapse without surfactant?</p>
+    <button onclick="showAnswer()">Show answer</button>
+    <p id="answer" class="small"></p>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const summary = document.getElementById('summary');
+const numbers = document.getElementById('numbers');
+function val(id) { return Number(document.getElementById(id).value); }
+function text(id) { return document.getElementById(id).value; }
+function showAnswer() { document.getElementById('answer').innerText = `Because for a smaller radius, a higher pressure is required to keep the alveolus open.`; }
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y, x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x, y+h, r);
+  ctx.arcTo(x, y+h, x, y, r);
+  ctx.arcTo(x, y, x+w, y, r);
+  ctx.closePath();
+}
+
+let t=0;
+function animate(){
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+ const surf=val('surf'); const mode=text('mode');
+ let effectiveSurf = mode==='prem' ? surf*0.45 : mode==='atelectasis' ? surf*0.6 : surf;
+ let tension = 1 - effectiveSurf/120;
+ ctx.fillStyle='#fff'; ctx.font='22px Arial'; ctx.textAlign='center';
+ ctx.fillText('Surfactant lowers surface tension and stabilises small alveoli',480,35);
+ const radii=[45,65,90,120];
+ radii.forEach((r,i)=>{
+   let x=210+i*180, y=235;
+   let pressure=(2*tension)/(r/100);
+   let collapse = pressure>2.2 && r<70;
+   ctx.strokeStyle=collapse?'#e74c3c':'#9ad0ff';
+   ctx.fillStyle=collapse?'rgba(231,76,60,0.25)':'rgba(74,163,255,0.18)';
+   ctx.lineWidth=4;
+   ctx.beginPath(); ctx.arc(x,y,collapse?18:r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+   ctx.fillStyle='#fff'; ctx.font='14px Arial'; ctx.fillText(collapse?'collapse risk':'stable',x,y+r+30);
+ });
+ ctx.fillStyle='#2ecc71';
+ for(let i=0;i<effectiveSurf/8;i++){ ctx.beginPath(); ctx.arc(130+(i*37)%720,380+Math.sin(i+t/20)*8,4,0,Math.PI*2); ctx.fill(); }
+ if(effectiveSurf>65) summary.innerText='Adequate surfactant: surface tension is low, helping alveoli remain open.';
+ else if(effectiveSurf>35) summary.innerText='Reduced surfactant: small alveoli require more pressure and become unstable.';
+ else summary.innerText='Severe surfactant deficiency: high collapse risk and increased work of breathing.';
+ numbers.innerText=`Effective surfactant: ${effectiveSurf.toFixed(0)}% | Relative surface tension: ${tension.toFixed(2)}`;
+ t++; requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+</body>
+</html>
