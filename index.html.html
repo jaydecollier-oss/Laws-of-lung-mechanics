@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Poiseuille's Law Interactive App</title>
+  <style>
+    :root {
+      --bg-dark: #1e1e1e;
+      --panel: #2a2a2a;
+      --panel-2: #333;
+      --text-light: #f0f0f0;
+      --muted: #b8b8b8;
+      --accent: #f1c40f;
+      --air: #8ecae6;
+      --bronchiole: #d98c5f;
+      --mucus: #75b843;
+      --danger: #e74c3c;
+      --good: #2ecc71;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-light);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      max-width: 980px;
+      width: 100%;
+      background: var(--panel);
+      border-radius: 14px;
+      padding: 22px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+
+    h1, h2, h3 { margin-top: 0; }
+
+    h1 {
+      text-align: center;
+      color: #fff;
+      border-bottom: 1px solid #444;
+      padding-bottom: 14px;
+      margin-bottom: 18px;
+    }
+
+    .intro {
+      color: var(--muted);
+      text-align: center;
+      max-width: 760px;
+      margin: 0 auto 18px;
+      line-height: 1.5;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .control-card, .formula-card, .summary-box, .quiz-box {
+      background: var(--panel-2);
+      border-radius: 10px;
+      padding: 16px;
+      border: 1px solid #444;
+    }
+
+    label {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-weight: bold;
+      margin-bottom: 10px;
+      gap: 12px;
+    }
+
+    .value {
+      color: var(--accent);
+      font-size: 1rem;
+      white-space: nowrap;
+    }
+
+    input[type=range] {
+      width: 100%;
+      cursor: pointer;
+    }
+
+    .small-note {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-top: 8px;
+      line-height: 1.35;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      background: #222;
+      border-radius: 10px;
+      border: 1px solid #444;
+      margin-bottom: 18px;
+    }
+
+    .results {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .equation {
+      font-size: 1.25rem;
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    .equation strong { color: var(--accent); }
+
+    .summary-box {
+      background: var(--accent);
+      color: #000;
+      font-weight: bold;
+      line-height: 1.45;
+      min-height: 78px;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    button {
+      background: #444;
+      color: #fff;
+      border: 1px solid #666;
+      border-radius: 8px;
+      padding: 10px 12px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover { background: #555; }
+
+    .quiz-box p { margin-top: 0; }
+
+    .quiz-feedback {
+      margin-top: 10px;
+      font-weight: bold;
+      min-height: 1.2em;
+    }
+
+    @media (max-width: 760px) {
+      .controls, .results { grid-template-columns: 1fr; }
+      body { padding: 10px; }
+      .container { padding: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Poiseuille's Law: Bronchiole Radius and Airflow</h1>
+    <p class="intro">
+      Explore why small changes in airway radius can cause very large changes in airflow. This is especially useful for understanding narrowed bronchioles in conditions such as chronic bronchitis, asthma, or excess mucus.
+    </p>
+
+    <div class="controls">
+      <div class="control-card">
+        <label for="radiusSlider">
+          Bronchiole radius
+          <span class="value" id="radiusValue">2.50 mm</span>
+        </label>
+        <input type="range" id="radiusSlider" min="0.5" max="5" value="2.5" step="0.1" />
+        <div class="small-note">The app compares the current radius with a normal reference radius of 2.5 mm.</div>
+      </div>
+
+      <div class="control-card">
+        <label for="mucusSlider">
+          Mucus / narrowing
+          <span class="value" id="mucusValue">0%</span>
+        </label>
+        <input type="range" id="mucusSlider" min="0" max="70" value="0" step="5" />
+        <div class="small-note">This visually narrows the airway and reduces the effective radius used in the airflow calculation.</div>
+      </div>
+    </div>
+
+    <canvas id="airwayCanvas" width="936" height="390"></canvas>
+
+    <div class="results">
+      <div class="formula-card">
+        <h3>Key relationship</h3>
+        <div class="equation">
+          Flow ∝ <strong>radius<sup>4</sup></strong><br />
+          Relative airflow = <strong id="flowEquation">(2.50 / 2.50)<sup>4</sup> = 100%</strong>
+        </div>
+        <div class="small-note">
+          Because radius is raised to the fourth power, halving the radius reduces airflow to about one-sixteenth of normal.
+        </div>
+      </div>
+
+      <div class="summary-box" id="summaryText">
+        Airflow is normal. The bronchiole is open and resistance is low.
+      </div>
+    </div>
+
+    <div class="quiz-box">
+      <h3>Check your understanding</h3>
+      <p>If the airway radius is reduced, what happens to airflow?</p>
+      <div class="button-row">
+        <button onclick="checkAnswer(false)">It decreases slightly</button>
+        <button onclick="checkAnswer(true)">It decreases dramatically</button>
+        <button onclick="checkAnswer(false)">It stays the same</button>
+      </div>
+      <div class="quiz-feedback" id="quizFeedback"></div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('airwayCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const radiusSlider = document.getElementById('radiusSlider');
+    const mucusSlider = document.getElementById('mucusSlider');
+    const radiusValue = document.getElementById('radiusValue');
+    const mucusValue = document.getElementById('mucusValue');
+    const flowEquation = document.getElementById('flowEquation');
+    const summaryText = document.getElementById('summaryText');
+    const quizFeedback = document.getElementById('quizFeedback');
+
+    const normalRadius = 2.5;
+    let particles = [];
+    let frame = 0;
+
+    class AirParticle {
+      constructor(y, speed) {
+        this.x = -20;
+        this.y = y;
+        this.speed = speed;
+        this.size = 4 + Math.random() * 3;
+      }
+
+      update() {
+        this.x += this.speed;
+        return this.x > canvas.width + 30;
+      }
+
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(142, 202, 230, 0.85)';
+        ctx.fill();
+      }
+    }
+
+    function getEffectiveRadius() {
+      const radius = parseFloat(radiusSlider.value);
+      const mucusPercent = parseFloat(mucusSlider.value);
+      return Math.max(0.2, radius * (1 - mucusPercent / 100));
+    }
+
+    function drawAirway(effectiveRadius, mucusPercent, relativeFlow) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const centerY = canvas.height / 2;
+      const maxAirwayHeight = 210;
+      const airwayHeight = Math.max(24, (effectiveRadius / 5) * maxAirwayHeight);
+      const wallThickness = 38;
+
+      // Background title
+      ctx.fillStyle = '#f0f0f0';
+      ctx.font = 'bold 22px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('Airflow through a bronchiole', canvas.width / 2, 34);
+
+      // Bronchiole walls
+      ctx.fillStyle = '#d98c5f';
+      ctx.beginPath();
+      ctx.roundRect(55, centerY - airwayHeight / 2 - wallThickness, canvas.width - 110, wallThickness, 22);
+      ctx.roundRect(55, centerY + airwayHeight / 2, canvas.width - 110, wallThickness, 22);
+      ctx.fill();
+
+      // Lumen
+      ctx.fillStyle = '#111';
+      ctx.beginPath();
+      ctx.roundRect(55, centerY - airwayHeight / 2, canvas.width - 110, airwayHeight, 30);
+      ctx.fill();
+
+      // Mucus patches
+      if (mucusPercent > 0) {
+        const mucusBulge = Math.min(airwayHeight * 0.48, 18 + mucusPercent * 0.9);
+        ctx.fillStyle = '#75b843';
+        for (let x = 95; x < canvas.width - 110; x += 115) {
+          ctx.beginPath();
+          ctx.ellipse(x, centerY - airwayHeight / 2 + 8, 46, mucusBulge, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.ellipse(x + 45, centerY + airwayHeight / 2 - 8, 40, mucusBulge * 0.85, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Air particles
+      particles.forEach(p => p.draw());
+
+      // Direction arrow
+      ctx.strokeStyle = '#8ecae6';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(80, centerY);
+      ctx.lineTo(canvas.width - 90, centerY);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(canvas.width - 90, centerY);
+      ctx.lineTo(canvas.width - 115, centerY - 15);
+      ctx.lineTo(canvas.width - 115, centerY + 15);
+      ctx.closePath();
+      ctx.fillStyle = '#8ecae6';
+      ctx.fill();
+
+      // Legend
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.beginPath();
+      ctx.roundRect(canvas.width - 245, 54, 205, 104, 10);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 14px Arial';
+      ctx.textAlign = 'left';
+      ctx.fillText('Legend', canvas.width - 225, 78);
+      drawLegendItem(canvas.width - 225, 102, '#8ecae6', 'Airflow');
+      drawLegendItem(canvas.width - 225, 126, '#d98c5f', 'Bronchiole wall');
+      drawLegendItem(canvas.width - 225, 150, '#75b843', 'Mucus / narrowing');
+
+      // Current state label
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 18px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(`Relative airflow: ${Math.round(relativeFlow * 100)}%`, canvas.width / 2, canvas.height - 28);
+    }
+
+    function drawLegendItem(x, y, color, label) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x + 8, y - 5, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = '13px Arial';
+      ctx.fillText(label, x + 24, y);
+    }
+
+    function updateText(effectiveRadius, relativeFlow) {
+      const radius = parseFloat(radiusSlider.value);
+      const mucusPercent = parseFloat(mucusSlider.value);
+      radiusValue.innerText = `${radius.toFixed(2)} mm`;
+      mucusValue.innerText = `${mucusPercent}%`;
+      flowEquation.innerHTML = `(${effectiveRadius.toFixed(2)} / ${normalRadius.toFixed(2)})<sup>4</sup> = ${Math.round(relativeFlow * 100)}%`;
+
+      if (relativeFlow > 0.8) {
+        summaryText.innerText = 'Airflow is near normal. The bronchiole is open and resistance is low.';
+        summaryText.style.backgroundColor = '#2ecc71';
+      } else if (relativeFlow > 0.35) {
+        summaryText.innerText = 'Airflow is reduced. Even moderate narrowing can noticeably increase resistance.';
+        summaryText.style.backgroundColor = '#f1c40f';
+      } else {
+        summaryText.innerText = 'Airflow is severely reduced. Small airway narrowing has a large effect because flow depends on radius to the fourth power.';
+        summaryText.style.backgroundColor = '#e74c3c';
+      }
+    }
+
+    function animate() {
+      const effectiveRadius = getEffectiveRadius();
+      const mucusPercent = parseFloat(mucusSlider.value);
+      const relativeFlow = Math.pow(effectiveRadius / normalRadius, 4);
+      const clampedFlow = Math.min(relativeFlow, 4);
+
+      updateText(effectiveRadius, relativeFlow);
+
+      const centerY = canvas.height / 2;
+      const maxAirwayHeight = 210;
+      const airwayHeight = Math.max(24, (effectiveRadius / 5) * maxAirwayHeight);
+
+      const spawnChance = Math.min(0.65, 0.04 + clampedFlow * 0.16);
+      const particleSpeed = 1.2 + clampedFlow * 2.6;
+
+      if (Math.random() < spawnChance) {
+        const y = centerY - airwayHeight / 2 + 12 + Math.random() * Math.max(1, airwayHeight - 24);
+        particles.push(new AirParticle(y, particleSpeed));
+      }
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        if (particles[i].update()) particles.splice(i, 1);
+      }
+
+      drawAirway(effectiveRadius, mucusPercent, relativeFlow);
+      frame++;
+      requestAnimationFrame(animate);
+    }
+
+    function checkAnswer(isCorrect) {
+      if (isCorrect) {
+        quizFeedback.innerText = 'Correct. Radius has a dramatic effect because it is raised to the fourth power.';
+        quizFeedback.style.color = '#2ecc71';
+      } else {
+        quizFeedback.innerText = 'Not quite. A small decrease in radius can cause a large decrease in airflow.';
+        quizFeedback.style.color = '#e74c3c';
+      }
+    }
+
+    animate();
+  </script>
+</body>
+</html>
